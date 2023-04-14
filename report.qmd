@@ -1,6 +1,6 @@
 ---
-title: "What time should I leave?"
-author: "A PUBH 7462 student"
+title: ""Hennepin County Map
+author: "Michala Carlson"
 format: 
   html:
     embed-resources: true
@@ -49,9 +49,6 @@ hennepin.base.map <- get_map(
                        crop = TRUE
                       )
 
-api_key <- Sys.getenv("MAPS_API_KEY")
-
-census_api_key(api_key, overwrite = TRUE)
 
 
 #Call the ACS API, returns a sf object
