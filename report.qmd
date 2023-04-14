@@ -1,5 +1,5 @@
 ---
-title: ""Hennepin County Map
+title: "Hennepin County Map"
 author: "Michala Carlson"
 format: 
   html:
