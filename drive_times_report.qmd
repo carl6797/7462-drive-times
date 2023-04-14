@@ -7,83 +7,71 @@ format:
 editor: visual
 ---
 
-```{r}
+```{r include=FALSE}
 #| echo: false
 #| message: false
 #| warning: false
 
-source("drive_times_setup.R")
 
 ## Load the API key
 api_key <- Sys.getenv("MAPS_API_KEY")
 
-## Set origin and destination
-## Change these to your own selections!
-ORIG <- "2221 University Ave SE, Minneapolis, MN"
-DEST <- "4940 France Ave S, Minneapolis, MN"
 ```
 
-## Route Information
-
-**Going From:** `r ORIG`
-
-**Going To:** `r DEST`
-
-**Earliest Departure:** `r Sys.time()`
-
-## Route Map
-
-```{r}
-#| echo: false
+```{r include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(paletteer)
+library(plotly)
 library(leaflet)
-library(gepaf)
+library(osmdata)
+library(ggmap)
+library(tidycensus)
 
-data <- decodePolyline(get_route_polyline(ORIG, DEST)$points)
+#My Colours (from viridis)
+my_purple <- "#440154FF"
+my_yellow <- "#FDE725FF"
 
-leaflet() %>% addProviderTiles(provider = "OpenStreetMap") %>%
-  addPolylines(data = data, 
-                lng = ~lon,
-               lat = ~lat)
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+
 ```
 
-## Driving Times
+```{r echo=FALSE}
+#From OSM
+hennepin.box <- osmdata::getbb("hennepin")
 
-```{r}
-#| echo: false
+#Get the base map (foundational layer)
+hennepin.base.map <- get_map(
+                       location = hennepin.box,
+                       source   = "stamen",
+                       maptype  = "watercolor",
+                       crop = TRUE
+                      )
 
-## Pick the times at which to generate travel times
-times_to_check <- Sys.time() + c(0, 15, 30, 45, 60)*60
+api_key <- Sys.getenv("MAPS_API_KEY")
 
-## Get the drive times
-drive_times <- map_dfr(times_to_check, get_travel_times, 
-                       orig = ORIG,
-                        dest = DEST)
+census_api_key(api_key, overwrite = TRUE)
 
-## Produce the drive times plot
-drive_times %>% 
-  pivot_longer(-departure_time, names_to = "estimate_type", values_to = "estimate") %>%
-  group_by(estimate_type) %>%
-  mutate(is_type_min = (estimate == min(estimate))) %>%
-  ungroup() %>%
-  mutate(type_descriptor = factor(estimate_type, labels = c("glass half full", "optimists", "pessimists"))) %>%
-# label = ifelse(estimate == min(estimate), sprintf("Best time for %s")))
-#   mutate(pessimist_label = ifelse(pessimistic == min(pessimistic), "Best time\nfor pessimists", ""),
-#          optimist_label = ifelse(optimistic == min(optimistic), "Best time\nfor optimists", "")) %>%
-  ggplot(aes(x = departure_time, y = estimate, color = estimate_type)) +
-  geom_line() +
-  geom_point(aes(alpha = is_type_min), size = 3) +
-  geom_vline(aes(xintercept = departure_time, alpha = is_type_min, color = estimate_type), linetype = "dashed") +
-  scale_color_manual(values = c("black", "green", "red")) +
-  scale_alpha_manual(values = c(0,1)) +
-  geom_text(data = function(x) { 
-    x %>% arrange(estimate_type) %>% 
-      filter(is_type_min) %>% 
-      mutate(label = sprintf("Best time for %s", type_descriptor))
-    },
-            aes(y = median(estimate), label = label), angle = 90, hjust = 0, nudge_y = mean(drive_times$best_guess)*0.05,
-            nudge_x = 100) +
-  guides(alpha = "none") +
-  theme_minimal() +
-  ylab("Minutes") +
-  xlab("Departure time")
+
+#Call the ACS API, returns a sf object
+hennepin_pop.df <- get_acs(
+  geography = "tract",
+  variables = "B01002_001E", 
+  state     = "MN",
+  county    = "Hennepin",
+  year      = 2020,
+  geometry  = TRUE,
+  cb        = FALSE
+)
+
+#Plot normally
+income.gg <- ggplot() + 
+  geom_sf(data = hennepin_pop.df, aes(fill = estimate)) + 
+  labs(title = "Hennepin County 2020 Median Age") + 
+  theme_void() + 
+  scale_fill_viridis_c("Median Age")
+
+#Display
+income.gg
 ```
